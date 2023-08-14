@@ -83,7 +83,6 @@ void loop() {
   Serial.println(rightUSSensor);
 
   // State Machine
-
   if (state == STOP) {
     leftSpeed = 0;
     rightSpeed = 0;
