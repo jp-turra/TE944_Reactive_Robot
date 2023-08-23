@@ -1,3 +1,7 @@
+#define DECODE_NEC
+//#define DECODE_DENON
+#include <IRremote.hpp>
+
 // Sound Speed
 #define SOUND_SPEED 0.0343 // cm/us
 
@@ -26,6 +30,10 @@
 #define ldr_front_right_pin A0
 #define ldr_front_left_pin A1
 
+// IR Remote
+#define IR_RECEIVE_PIN 45
+#define ENABLE_LED_FEEDBACK 47
+
 // Ultrassonic Limits
 #define FRONT_US_LIMIT 15
 #define LEFT_US_LIMIT 15
@@ -46,6 +54,27 @@ enum operationMode {
   REACTIVE = 2,
 };
 
+enum IRControlMap {
+  ONE     = 0x45,
+  TWO     = 0x46,
+  THREE   = 0x47,
+  FOUR    = 0x44,
+  FIVE    = 0x40,
+  SIX     = 0x43,
+  SEVEN   = 0x07,
+  EIGHT   = 0x15,
+  NINE    = 0x09,
+  ASTERISK= 0x16,
+  ZERO    = 0x19,
+  HASHTAG = 0x0D,
+  UP      = 0x18,
+  LEFT    = 0x08,
+  RIGHT   = 0x5A,
+  DOWN    = 0x52,
+  OK      = 0X1C
+};
+
+bool stopAll = true;
 operationState state = STOP;
 operationMode mode = BRAITENGER_FOLLOW;
 
@@ -94,12 +123,52 @@ void setup() {
   pinMode(ldr_front_right_pin, INPUT);
   pinMode(ldr_back_left_pin, INPUT);
   pinMode(ldr_back_right_pin, INPUT);
+
+  // IR Remote setup
+  IrReceiver.begin(IR_RECEIVE_PIN, true, ENABLE_LED_FEEDBACK); // Start the receiver
   
 }
 
 void loop() {
   // Upload sensors value
   delay(100);
+
+  if (IrReceiver.decode()) {
+    Serial.println("******************** DECODING IR ************************");
+
+    if (IrReceiver.decodedIRData.command == IRControlMap::ONE) 
+    {
+      Serial.println("One pressed, setting reactive");
+      mode = operationMode::REACTIVE;
+    }
+    else if (IrReceiver.decodedIRData.command == IRControlMap::TWO) 
+    {
+      Serial.println("Two pressed setting baiterberg follow");
+      mode = operationMode::BRAITENGER_FOLLOW;
+    }
+    else if (IrReceiver.decodedIRData.command == IRControlMap::THREE) 
+    {
+      Serial.println("Three pressed setting baiterberg hide");
+      mode = operationMode::BRAITENGER_HIDE;
+    }
+    else if (IrReceiver.decodedIRData.command == IRControlMap::OK) 
+    {
+      Serial.println("OK pressed setting baiterberg follow");
+      stopAll = !stopAll;
+    }
+    else 
+    {
+      IrReceiver.printIRResultShort(&Serial); // Print complete received data in one line
+    }
+
+    Serial.print("Protocol: ");
+    Serial.println(IrReceiver.getProtocolString());
+    
+    // IrReceiver.decodedIRData.command
+    // IrReceiver.
+
+    IrReceiver.resume(); // Enable receiving of the next value
+  }
 
   if (mode == BRAITENGER_FOLLOW || mode == BRAITENGER_HIDE)
   {
@@ -115,14 +184,14 @@ void loop() {
     uint16_t left_light = ldr_back_left + ldr_front_left;
     uint16_t right_light = ldr_back_right + ldr_front_right;
 
-    // Serial.print("[LDR]: ");
-    // Serial.print(front_light);
-    // Serial.print("\t");
-    // Serial.print(back_light);
-    // Serial.print("\t");
-    // Serial.print(left_light);
-    // Serial.print("\t");
-    // Serial.println(right_light);
+    Serial.print("[LDR]: ");
+    Serial.print(front_light);
+    Serial.print("\t");
+    Serial.print(back_light);
+    Serial.print("\t");
+    Serial.print(left_light);
+    Serial.print("\t");
+    Serial.println(right_light);
 
     if (front_light < 450 && 
         front_light < back_light && 
@@ -273,13 +342,20 @@ void useL298NDriver(float pwm_left, float pwm_right) {
 }
 
 void setSpeed() {
-
-  Serial.print("Setting Speed");
-  Serial.print("\tLeft: ");
-  Serial.print(leftSpeed);
-  Serial.print("\tRight: ");
-  Serial.print(rightSpeed);
-  Serial.println("");
+  if (stopAll)
+  {
+    leftSpeed = 0.0;
+    rightSpeed = 0.0;
+  }
+  else 
+  {
+    Serial.print("Setting Speed");
+    Serial.print("\tLeft: ");
+    Serial.print(leftSpeed);
+    Serial.print("\tRight: ");
+    Serial.print(rightSpeed);
+    Serial.println("");
+  }
 
   // Set Speed (0 - 255) 
   useL298NDriver((leftSpeed * 255), (rightSpeed * 255));
