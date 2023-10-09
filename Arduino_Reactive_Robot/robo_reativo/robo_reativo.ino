@@ -1,28 +1,28 @@
 #define DECODE_NEC
-//#define DECODE_DENON
 #include <IRremote.hpp>
 
 // Sound Speed
 #define SOUND_SPEED 0.0343 // cm/us
+#define PULSE_TIMEOUT 100000 // 100000 us (100ms);
 
 // Ultrassonic Sensors Pins
-#define ultrasonFrontTrgPin 30  
-#define ultrasonFrontEchoPin 31  
+#define ultrasonFrontTrgPin 4
+#define ultrasonFrontEchoPin 5  
 
-#define ultrasonLeftTrgPin 3 
-#define ultrasonLeftEchoPin 4
+#define ultrasonLeftTrgPin 2
+#define ultrasonLeftEchoPin 3
 
-#define ultrasonRightTrgPin 13  
-#define ultrasonRightEchoPin 12
+#define ultrasonRightTrgPin 6
+#define ultrasonRightEchoPin 7
 
 // L298N Driver Pins
-#define pwm_right_pin 38
-#define pwm_left_pin 48
+#define pwm_right_pin 8
+#define pwm_left_pin 13
 
-#define in_a_pin 46
-#define in_b_pin 44
-#define in_c_pin 42
-#define in_d_pin 40
+#define in_a_pin 12
+#define in_b_pin 11
+#define in_c_pin 10
+#define in_d_pin 9
 
 // LDRs Pins
 #define ldr_back_right_pin A15
@@ -75,8 +75,10 @@ enum IRControlMap {
 };
 
 bool stopAll = true;
+bool enableLog = false;
+
 operationState state = STOP;
-operationMode mode = BRAITENGER_FOLLOW;
+operationMode mode = operationMode::REACTIVE;
 
 // Ultrassonic Sensors Handlers
 float frontUSSensor = 0;
@@ -153,8 +155,13 @@ void loop() {
     }
     else if (IrReceiver.decodedIRData.command == IRControlMap::OK) 
     {
-      Serial.println("OK pressed setting baiterberg follow");
+      Serial.println("OK pressed, toggling baiterberg follow");
       stopAll = !stopAll;
+    }
+    else if (IrReceiver.decodedIRData.command == IRControlMap::HASHTAG)
+    {
+      Serial.println("HASTAG pressed, toggling LOG mode");
+      enableLog = !enableLog;
     }
     else 
     {
@@ -164,9 +171,6 @@ void loop() {
     Serial.print("Protocol: ");
     Serial.println(IrReceiver.getProtocolString());
     
-    // IrReceiver.decodedIRData.command
-    // IrReceiver.
-
     IrReceiver.resume(); // Enable receiving of the next value
   }
 
@@ -265,7 +269,7 @@ void loop() {
     else if (state == GO_AHEAD) 
     {
       leftSpeed = 1;
-      rightSpeed = 0.6;
+      rightSpeed = 1;
       
       float error = 0;
       float Kp = 1;
@@ -369,7 +373,7 @@ float readUSSensor(int trigger, int echo) {
   digitalWrite(trigger, LOW);
 
   // Get pulse duration in microseconds
-  float duration = pulseIn(echo, HIGH);
+  float duration = pulseIn(echo, HIGH, PULSE_TIMEOUT);
 
   // Get distance 
   float distance = SOUND_SPEED  * duration / 2;
